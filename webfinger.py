@@ -18,6 +18,7 @@ from oauth_dropins.webutil.util import json_dumps
 from app import app, cache
 import common
 from models import User
+from werkzeug.exceptions import BadRequest
 
 CACHE_TIME = datetime.timedelta(seconds=15)
 NON_TLDS = frozenset(('html', 'json', 'php', 'xml'))
@@ -29,6 +30,13 @@ logger = logging.getLogger(__name__)
 # @cache.cached(
 #     CACHE_TIME.total_seconds(),
 #     make_cache_key=lambda domain: f'{request.path} {request.headers.get("Accept")}')
+
+
+class UseCanonical(Exception):
+    def __init__(self, domain, url):
+        super().__init__()
+        self.domain = domain
+        self.url = url
 
 class Actor(flask_util.XrdOrJrd):
     """Fetches a site's home page, converts its mf2 to WebFinger, and serves.
@@ -66,11 +74,16 @@ class Actor(flask_util.XrdOrJrd):
             error(f"didn't find a representative h-card (http://microformats.org/wiki/representative-hcard-parsing) in any of {urls}")
 
         logger.info(f'Generating WebFinger data for {domain}')
-        user = User.get_or_create(domain)
         props = hcard.get('properties', {})
         urls = util.dedupe_urls(props.get('url', []) + [resp.url])
         canonical_url = urls[0]
 
+        # Enforce canonical url
+        canonical_domain = urllib.parse.urlparse(canonical_url).netloc or domain
+        if canonical_domain != domain:
+            raise UseCanonical(canonical_domain, canonical_url)
+
+        user = User.get_or_create(domain)
         user.actor_as2 = json_dumps(common.postprocess_as2(
             as2.from_as1(microformats2.json_to_object(hcard)), user=user))
         user.put()
@@ -139,9 +152,9 @@ class Actor(flask_util.XrdOrJrd):
                 'rel': 'http://schemas.google.com/g/2010#updates-from',
                 'type': common.CONTENT_TYPE_ATOM,
                 'href': atom,
-            }, {
-                'rel': 'hub',
-                'href': hub,
+#           }, {
+#               'rel': 'hub',
+#               'href': hub,
             }, {
                 'rel': 'magic-public-key',
                 'href': user.href(),
@@ -185,11 +198,17 @@ class Webfinger(Actor):
         except ValueError:
             domain = urllib.parse.urlparse(resource).netloc or resource
 
+        if not re.match(common.DOMAIN_RE, domain):
+            raise BadRequest(domain)
+
         url = None
         if util.is_web(resource):
             url = resource
 
-        return super().template_vars(domain=domain, url=url)
+        try:
+            return super().template_vars(domain=domain, url=url)
+        except UseCanonical as e:
+            return super().template_vars(domain=e.domain, url=e.url)
 
 
 class HostMeta(flask_util.XrdOrJrd):

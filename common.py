@@ -24,7 +24,7 @@ from models import Activity, User
 
 logger = logging.getLogger(__name__)
 
-DOMAIN_RE = r'([^/:]+\.[^/:]+)'
+DOMAIN_RE = r'([^/:]+\.[^/:]*pandala.org|pandala.org)'
 ACCT_RE = r'(?:acct:)?([^@]+)@' + DOMAIN_RE
 TLD_BLOCKLIST = ('7z', 'asp', 'aspx', 'gif', 'html', 'ico', 'jpg', 'jpeg', 'js',
                  'json', 'php', 'png', 'rar', 'txt', 'yaml', 'yml', 'zip')
@@ -61,9 +61,9 @@ SUPPORTED_VERBS = (
     'update',
 )
 
-PRIMARY_DOMAIN = 'fed.brid.gy'
+PRIMARY_DOMAIN = 'fediverse.pandala.org'
 OTHER_DOMAINS = (
-    'bridgy-federated.appspot.com',
+    'pandala.ey.r.appspot.com',
     'localhost',
 )
 DOMAINS = (PRIMARY_DOMAIN,) + OTHER_DOMAINS
@@ -84,7 +84,7 @@ utcnow = datetime.datetime.utcnow
 def default_signature_user():
     global _DEFAULT_SIGNATURE_USER
     if _DEFAULT_SIGNATURE_USER is None:
-        _DEFAULT_SIGNATURE_USER = User.get_or_create('snarfed.org')
+        _DEFAULT_SIGNATURE_USER = User.get_or_create('datakurre.pandala.org')
     return _DEFAULT_SIGNATURE_USER
 
 

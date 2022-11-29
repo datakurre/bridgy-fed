@@ -15,6 +15,7 @@ from oauth_dropins.webutil.models import StringIdModel
 from oauth_dropins.webutil import util
 from oauth_dropins.webutil.util import json_dumps, json_loads
 
+import re
 import common
 
 # https://github.com/snarfed/bridgy-fed/issues/314
@@ -23,6 +24,7 @@ WWW_DOMAINS = frozenset((
 ))
 
 logger = logging.getLogger(__name__)
+PANDALA_RE = r'([^/:]+\.[^/:]*pandala.org|pandala.org)'
 
 
 class User(StringIdModel):
@@ -110,16 +112,18 @@ class User(StringIdModel):
                         for u in util.get_list(actor, 'url')]:
                 if url and url.startswith('acct:'):
                     urluser, urldomain = util.parse_acct_uri(url)
-                    if urldomain == domain:
-                        logger.info(f'Found custom username: {urluser}')
-                        return urluser
+                    if urldomain == domain or re.match(PANDALA_RE, urldomain):
+                        logger.info(f'found custom username: {urluser}@{urldomain}')
+                        return f'{urluser}@{urldomain}'
+
 
         logger.info(f'Defaulting username to domain {domain}')
         return domain
 
     def address(self):
         """Returns this user's ActivityPub address, eg '@me@foo.com'."""
-        return f'@{self.username()}@{self.key.id()}'
+        username = self.username()
+        return f'@{username}@{self.key.id()}' if '@' not in username else username
 
     def user_page_link(self):
         """Returns a pretty user page link with the user's name and profile picture."""
